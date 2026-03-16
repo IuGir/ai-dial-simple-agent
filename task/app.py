@@ -14,13 +14,31 @@ from task.tools.users.user_client import UserClient
 from task.tools.web_search import WebSearchTool
 
 DIAL_ENDPOINT = "https://ai-proxy.lab.epam.com"
-API_KEY = os.getenv('DIAL_API_KEY')
+API_KEY = os.getenv("DIAL_API_KEY")
+DIAL_DEPLOYMENT = os.getenv("DIAL_DEPLOYMENT", "gpt-4o")
+
 
 def main():
-    #TODO:
-    # 1. Create UserClient
-    # 2. Create DialClient with all tools (WebSearchTool, GetUserByIdTool, SearchUsersTool, CreateUserTool, UpdateUserTool, DeleteUserTool)
-    # 3. Create Conversation and add there first System message with SYSTEM_PROMPT (you need to write it in task.prompts#SYSTEM_PROMPT)
+    if not API_KEY or not API_KEY.strip():
+        print("Error: Set DIAL_API_KEY environment variable.")
+        return
+    user_client = UserClient()
+    tools = [
+        WebSearchTool(api_key=API_KEY or "", endpoint=DIAL_ENDPOINT),
+        GetUserByIdTool(user_client),
+        SearchUsersTool(user_client),
+        CreateUserTool(user_client),
+        UpdateUserTool(user_client),
+        DeleteUserTool(user_client),
+    ]
+    dial_client = DialClient(
+        endpoint=DIAL_ENDPOINT,
+        deployment_name=DIAL_DEPLOYMENT,
+        api_key=API_KEY or "",
+        tools=tools,
+    )
+    conversation = Conversation()
+    conversation.add_message(Message(role=Role.SYSTEM, content=SYSTEM_PROMPT))
 
     print("Type your question or 'exit' to quit.")
     print("Sample:")
@@ -32,11 +50,11 @@ def main():
         if user_input.lower() == "exit":
             print("Exiting the chat. Goodbye!")
             break
-        #TODO:
-        # 1. Add User message to Conversation
-        # 2. Call DialClient with conversation history
-        # 3. Add Assistant message to Conversation and print its content
 
+        conversation.add_message(Message(role=Role.USER, content=user_input))
+        assistant_message = dial_client.get_completion(conversation.get_messages())
+        conversation.add_message(assistant_message)
+        print(assistant_message.content or "(No content)")
 
         print("=" * 100)
         print()
